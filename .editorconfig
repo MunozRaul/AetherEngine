@@ -1,0 +1,12 @@
+[*.cs]
+# Treat unused using directives as an error (or use 'warning')
+dotnet_diagnostic.IDE0005.severity = error
+
+# --- Var Preferences ---
+# Prefer explicit types over 'var' for built-in, framework, and apparent types
+csharp_style_var_elsewhere = false:suggestion
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = false:suggestion
+
+# Elevate the preference (IDE0008) to a compiler warning or error
+dotnet_diagnostic.IDE0008.severity = error
