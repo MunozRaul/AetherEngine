@@ -55,3 +55,38 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Visual Studio cache and index files
+.vs/
+*.vsidx
+
+# VS 2026 User-specific files & Diagnostics
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.tools/
+.diagnostictools/
+
+# Roslyn compiler caches
+.rsp
+*.generated.cs
+.compiler-cache/
+
+# Large Asset Safety Net (Optional - uncomment if you want to block them)
+# *.fbx
+# *.obj
+# *.max
+# *.blend
+
+# OS-generated thumbnail caches
+Thumbs.db
+.DS_Store
+
+# Alternative Editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln.swp

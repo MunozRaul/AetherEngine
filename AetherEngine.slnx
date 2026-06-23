@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Aether.Core/Aether.Core.csproj" />
+  <Project Path="Aether.Glaze/Aether.Glaze.csproj" />
+  <Project Path="Aether.Ray/Aether.Ray.csproj" />
+  <Project Path="Aether.Realmheart/Aether.Realmheart.csproj" />
+</Solution>
