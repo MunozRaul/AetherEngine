@@ -14,6 +14,9 @@ public class CpuRaytracer
         _sun = sun;
     }
 
+    // Expose the direction towards the sun to the outside world since sun shall be readonly
+    public Vector3 SunDirection => _sun.ToSun;
+
     // Renders the scene into a flat RGBA byte array (width * height * 4 bytes)
     public byte[] Render(Scene scene, Camera camera)
     {

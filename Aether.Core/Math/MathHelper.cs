@@ -3,7 +3,7 @@
     /// <summary>
     /// float constants, clamp, lerp
     /// </summary>
-    internal class MathHelper
+    public class MathHelper
     {
     }
 }
