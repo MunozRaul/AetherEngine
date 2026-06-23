@@ -37,6 +37,9 @@ public class GameApp : GameWindow
     // Input
     private InputHandler _input = null!;
 
+    // Racetracer target tracker
+    private SceneObject _raytracerCube = null!;
+
     public GameApp(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws) { }
 
     protected override void OnLoad()
@@ -56,8 +59,11 @@ public class GameApp : GameWindow
         // Build scene for raytracer
         _scene.Objects.Add(new SceneObject { Hittable = new InfinitePlane() });
         // Cube AABB — will update each frame to match animation
-        Box cubeHittable = new Box { Min = new SysVec3(-0.5f, 1f, -0.5f), Max = new SysVec3(0.5f, 2f, 0.5f) };
-        _scene.Objects.Add(new SceneObject { Hittable = cubeHittable });
+        _raytracerCube = new SceneObject
+        {
+            Hittable = new Box { Min = new SysVec3(-0.25f, 1.25f, -0.25f), Max = new SysVec3(0.25f, 1.75f, 0.25f) }
+        };
+        _scene.Objects.Add(_raytracerCube);
 
         // Raytracer
         RaytracerSettings rtSettings = new RaytracerSettings { Width = 320, Height = 180 };   // low res for speed
@@ -85,6 +91,21 @@ public class GameApp : GameWindow
         // Animate cube: spin + bob
         _cubeTransform.Rotation = new SysVec3(0, _cubeTransform.Rotation.Y + 45f * dt, 0);
         _cubeTransform.Position = new SysVec3(0, 1.5f + MathF.Sin((float)GLFW.GetTime()) * 0.3f, 0);
+
+        // Swap out the entire Box instance to match the new position to synchronize raytracer
+        // (this is assuming index 1 matches the box added in OnLoad)
+        // NOTE: If swapping gets too inefficient, adding a mutation helper to Box is an alternative.
+        if (_scene.Objects.Count > 1 && _scene.Objects[1].Hittable is Box)
+        {
+            float size = 0.5f; // Matches the MeshFactory size
+
+            // Create a brand new immutable box at the updated position
+            _raytracerCube.Hittable = new Box
+            {
+                Min = _cubeTransform.Position - new SysVec3(size / 2f),
+                Max = _cubeTransform.Position + new SysVec3(size / 2f)
+            };
+        }
 
         // Re-raytrace periodically (not every frame — it's slow)
         _raytraceCooldown -= dt;
@@ -114,21 +135,37 @@ public class GameApp : GameWindow
         // Reset default object color to grey
         _shader.SetVector3("uAlbedo", new TKVec3(0.75f, 0.75f, 0.75f));
 
-        // Draw plane
+        // ----------------------------------------------------
+        // Draw plane with raytracer texture enabled
+        // ----------------------------------------------------
+        // Bind your CPU raytracer output texture to OpenGL Unit 0
+        GL.ActiveTexture(TextureUnit.Texture0);
+        GL.BindTexture(TextureTarget.Texture2D, _raytracedTex.Handle);
+
+        _shader.SetInt("uRaytraceTexture", 0);
+        _shader.SetInt("uUseTexture", 1); // Turn ON texture override for the floor
+
         _shader.SetMatrix4("uModel", TKMatrix4.Identity);
         _plane.Draw();
 
-        // Draw cube with current animated transform
+        // Turn OFF texture override so the cube stays solid
+        _shader.SetInt("uUseTexture", 0);
+
+        // ----------------------------------------------------
+        // Draw cube with standard raster (no texture)
+        // ----------------------------------------------------
         _shader.SetMatrix4("uModel", _cubeTransform.GetModelMatrix().ToOpenTK());
         _cube.Draw();
 
-        // Draw sun in the skybox
+        // ----------------------------------------------------
+        // Draw sun in the skybox 
+        // ----------------------------------------------------
         SysVec3 sunDirFromOrigin = _raytracer.SunDirection;
         SysVec3 sunWorldPos = _camera.Position + (SysVec3.Normalize(sunDirFromOrigin) * 150f);
         TKMatrix4 sunModel = TKMatrix4.CreateScale(4f) * TKMatrix4.CreateTranslation(sunWorldPos.X, sunWorldPos.Y, sunWorldPos.Z);
         _shader.SetMatrix4("uModel", sunModel);
-        // Inject a bright yellow color override into the shader
-        _shader.SetVector3("uAlbedo", new TKVec3(2.0f, 2.0f, 1.2f)); // values > 1.0 look bright!
+        // Inject a bright yellow color override into the shader (values > 1.0 look bright)
+        _shader.SetVector3("uAlbedo", new TKVec3(2.0f, 2.0f, 1.2f));
         _cube.Draw();
 
         SwapBuffers();
@@ -149,41 +186,56 @@ public class GameApp : GameWindow
         base.OnUnload();
     }
 
-    // Minimal vertex shader source
+    // Modified vertex shader to pass UV coordinates to the fragment shader
     private const string SceneVert = @"
         #version 330 core
         layout(location=0) in vec3 aPos;
         layout(location=1) in vec3 aNormal;
         layout(location=2) in vec2 aUV;
+        
         uniform mat4 uModel, uView, uProjection;
+        
         out vec3 vNormal;
         out vec3 vFragPos;
+        out vec2 vUV;
 
         void main() {
             vec4 worldPos  = uModel * vec4(aPos, 1.0);
             vFragPos       = worldPos.xyz;
             vNormal        = mat3(transpose(inverse(uModel))) * aNormal;
+            vUV            = aUV; // Pass texture coordinates down
             gl_Position    = uProjection * uView * worldPos;
         }";
 
-    // Minimal fragment shader — directional sun + ambient
+    // Hybrid fragment shader that can toggle between standard lighting and raytracer texture
     private const string SceneFrag = @"
         #version 330 core
         in  vec3 vNormal;
         in  vec3 vFragPos;
+        in  vec2 vUV;
         out vec4 FragColor;
 
         uniform vec3 uSunDir     = normalize(vec3(-1.0, -1.5, -0.5));
         uniform vec3 uSunColor   = vec3(1.0, 0.95, 0.85);
         uniform vec3 uAlbedo     = vec3(0.75, 0.75, 0.75);
 
+        uniform sampler2D uRaytraceTexture;
+        uniform bool uUseTexture = false;
+
         void main() {
-            // If the color is set to be ultra-bright like the sun, make it emit rays since it can act as a light source
+            // Emissive shortcut for our sun object
             if (uAlbedo.r > 1.5) {
                 FragColor = vec4(uAlbedo, 1.0);
                 return;
             }
 
+            // If toggled, map our raytracer pixels straight onto the surface geometry
+            if (uUseTexture) {
+                FragColor = texture(uRaytraceTexture, vUV);
+                return;
+            }
+
+            // Fallback standard rasterization shader
             vec3  n       = normalize(vNormal);
             float diff    = max(dot(n, -uSunDir), 0.0);
             vec3  color   = uAlbedo * (uSunColor * diff + vec3(0.08));
