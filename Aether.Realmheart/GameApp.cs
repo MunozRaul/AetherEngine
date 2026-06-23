@@ -3,13 +3,10 @@ using Aether.Glaze;
 using Aether.Ray;
 using Aether.Ray.Shapes;
 using OpenTK.Graphics.OpenGL4;
-using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using SysVec3 = System.Numerics.Vector3;
-using TKMatrix4 = OpenTK.Mathematics.Matrix4;
-using TKVec3 = OpenTK.Mathematics.Vector3;
 
 namespace Aether.Realmheart;
 
@@ -32,7 +29,7 @@ public class GameApp : GameWindow
     // Raytracer
     private CpuRaytracer _raytracer = null!;
     private float _raytraceCooldown = 0f;
-    private const float RaytracePeriod = 0.05f;   // re-render every 50 ms
+    private const float RaytracePeriod = 0.016f;   // re-render every 16 ms (60 fps)
 
     // Input
     private InputHandler _input = null!;
@@ -71,6 +68,10 @@ public class GameApp : GameWindow
         _raytracer = new CpuRaytracer(rtSettings, sun);
         _raytracedTex = new GlTexture(rtSettings.Width, rtSettings.Height);
 
+        _camera.Position = new SysVec3(0, 1.7f, 5f);
+        _camera.Yaw = -90f; // Forces the camera orientation matrix to point at the scene center
+        _camera.Pitch = 0f;  // Look straight across the horizon
+        _camera.Update();
         _input = new InputHandler(_camera);
     }
 
@@ -122,51 +123,22 @@ public class GameApp : GameWindow
         base.OnRenderFrame(e);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-        _shader.Use();
-        // setup global scene matrices
-        TKMatrix4 proj = TKMatrix4.CreatePerspectiveFieldOfView(
-            MathHelper.DegreesToRadians(75f),
-            (float)Size.X / Size.Y, 0.1f, 200f);
-        TKMatrix4 view = _camera.GetViewMatrix().ToOpenTK(); // convert System.Numerics → OpenTK
+        // This stretches my 320x180 raytraced image across my full screen window
+        GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, 0);
 
-        _shader.SetMatrix4("uProjection", proj);
-        _shader.SetMatrix4("uView", view);
+        // Create an internal framebuffer to hold the texture for copying
+        int fbo = GL.GenFramebuffer();
+        GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, fbo);
+        GL.FramebufferTexture2D(FramebufferTarget.ReadFramebuffer, FramebufferAttachment.ColorAttachment0,
+                                TextureTarget.Texture2D, _raytracedTex.Handle, 0);
 
-        // Reset default object color to grey
-        _shader.SetVector3("uAlbedo", new TKVec3(0.75f, 0.75f, 0.75f));
+        // Copy the raytracer image straight onto the screen surface (Framebuffer 0)
+        GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, 0);
+        GL.BlitFramebuffer(0, 0, 320, 180,
+                          0, 0, Size.X, Size.Y,
+                          ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
 
-        // ----------------------------------------------------
-        // Draw plane with raytracer texture enabled
-        // ----------------------------------------------------
-        // Bind your CPU raytracer output texture to OpenGL Unit 0
-        GL.ActiveTexture(TextureUnit.Texture0);
-        GL.BindTexture(TextureTarget.Texture2D, _raytracedTex.Handle);
-
-        _shader.SetInt("uRaytraceTexture", 0);
-        _shader.SetInt("uUseTexture", 1); // Turn ON texture override for the floor
-
-        _shader.SetMatrix4("uModel", TKMatrix4.Identity);
-        _plane.Draw();
-
-        // Turn OFF texture override so the cube stays solid
-        _shader.SetInt("uUseTexture", 0);
-
-        // ----------------------------------------------------
-        // Draw cube with standard raster (no texture)
-        // ----------------------------------------------------
-        _shader.SetMatrix4("uModel", _cubeTransform.GetModelMatrix().ToOpenTK());
-        _cube.Draw();
-
-        // ----------------------------------------------------
-        // Draw sun in the skybox 
-        // ----------------------------------------------------
-        SysVec3 sunDirFromOrigin = _raytracer.SunDirection;
-        SysVec3 sunWorldPos = _camera.Position + (SysVec3.Normalize(sunDirFromOrigin) * 150f);
-        TKMatrix4 sunModel = TKMatrix4.CreateScale(4f) * TKMatrix4.CreateTranslation(sunWorldPos.X, sunWorldPos.Y, sunWorldPos.Z);
-        _shader.SetMatrix4("uModel", sunModel);
-        // Inject a bright yellow color override into the shader (values > 1.0 look bright)
-        _shader.SetVector3("uAlbedo", new TKVec3(2.0f, 2.0f, 1.2f));
-        _cube.Draw();
+        GL.DeleteFramebuffer(fbo);
 
         SwapBuffers();
     }
