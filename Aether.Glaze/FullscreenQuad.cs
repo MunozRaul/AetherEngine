@@ -1,6 +1,5 @@
 ﻿namespace Aether.Glaze;
 
-public class Class1
+internal class FullscreenQuad
 {
-
 }
