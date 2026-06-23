@@ -33,17 +33,16 @@ public class CpuRaytracer
             {
                 // Map pixel to [-1,1] NDC
                 float u = (2f * (col + 0.5f) / w - 1f) * aspectRatio * fovScale;
-                float v = (1f - 2f * (row + 0.5f) / h) * fovScale;
+                float v = (2f * (row + 0.5f) / h - 1f) * fovScale;
 
                 // Build ray in world space from camera orientation
-                Vector3 dir = Vector3.Normalize(
-                    camera.Forward + u * camera.Right + v * Vector3.Cross(camera.Right, camera.Forward)
-                );
+                Vector3 dir = Vector3.Normalize(camera.Forward + (u * camera.Right) + (v * camera.Up));
                 Core.Ray ray = new Core.Ray { Origin = camera.Position, Direction = dir };
 
                 Vector3 color = TraceRay(ray, scene, 0);
 
-                int idx = (row * w + col) * 4;
+                int invertedRow = h - 1 - row;
+                int idx = (invertedRow * w + col) * 4;
                 pixels[idx + 0] = ToByte(color.X);
                 pixels[idx + 1] = ToByte(color.Y);
                 pixels[idx + 2] = ToByte(color.Z);
@@ -65,16 +64,28 @@ public class CpuRaytracer
         Core.Ray shadowRay = new Core.Ray { Origin = hit.Point + hit.Normal * 0.001f, Direction = _sun.ToSun };
         bool inShadow = scene.HitAnything(shadowRay, 0.001f, float.MaxValue, out _);
 
-        // Simple Lambertian diffuse
+        // Add a 0.1f ambient baseline so shadows and unlit sides are dark gray, not pitch black
+        float ambient = 0.1f;
         float diffuse = inShadow ? 0.05f : MathF.Max(0f, Vector3.Dot(hit.Normal, _sun.ToSun));
-        Vector3 albedo = new Vector3(0.8f, 0.8f, 0.8f);   // light gray for everything
+        Vector3 albedo = new Vector3(0.8f, 0.8f, 0.8f); // light gray for everything
 
-        return albedo * _sun.Color * _sun.Intensity * diffuse;
+        return albedo * _sun.Color * _sun.Intensity * (diffuse + ambient);
     }
 
-    private static Vector3 SkyColor(Core.Ray ray)
+    private Vector3 SkyColor(Core.Ray ray)
     {
-        float t = 0.5f * (Vector3.Normalize(ray.Direction).Y + 1f);
+        Vector3 rayDir = Vector3.Normalize(ray.Direction);
+
+        // Check if the ray is looking directly at the sun direction
+        // A dot product of 1.0 means a perfect match. 0.995 gives a sharp sun disc.
+        float sunDot = Vector3.Dot(rayDir, _sun.ToSun);
+        if (sunDot > 0.995f)
+        {
+            return new Vector3(10f, 10f, 8f); // High intensity warm white/yellow glow
+        }
+
+        // Fallback to standard sky gradient if we aren't looking at the sun
+        float t = 0.5f * (rayDir.Y + 1f);
         return Vector3.Lerp(new Vector3(1f, 1f, 1f), new Vector3(0.5f, 0.7f, 1f), t);
     }
 

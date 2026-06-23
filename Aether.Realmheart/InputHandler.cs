@@ -25,7 +25,14 @@ public class InputHandler
         if (kb.IsKeyDown(Keys.D)) _camera.Position += _camera.Right * MoveSpeed * dt;
 
         // Mouse look
-        if (_firstMove) { _lastMouseX = mouse.X; _lastMouseY = mouse.Y; _firstMove = false; }
+        if (_firstMove)
+        {
+            _lastMouseX = mouse.X;
+            _lastMouseY = mouse.Y;
+            _firstMove = false;
+            return; // Ignore the initial window centering jump data to remove artificial mouse jump from (0,0) to WindowWidth / 2
+        }
+
         float dx = mouse.X - _lastMouseX;
         float dy = mouse.Y - _lastMouseY;
         _lastMouseX = mouse.X;

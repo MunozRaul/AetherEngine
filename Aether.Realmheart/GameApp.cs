@@ -30,6 +30,8 @@ public class GameApp : GameWindow
     private CpuRaytracer _raytracer = null!;
     private float _raytraceCooldown = 0f;
     private const float RaytracePeriod = 0.016f;   // re-render every 16 ms (60 fps)
+    private const int WidthPixels = 640;
+    private const int HeightPixels = 360;
 
     // Input
     private InputHandler _input = null!;
@@ -63,7 +65,7 @@ public class GameApp : GameWindow
         _scene.Objects.Add(_raytracerCube);
 
         // Raytracer
-        RaytracerSettings rtSettings = new RaytracerSettings { Width = 320, Height = 180 };   // low res for speed
+        RaytracerSettings rtSettings = new RaytracerSettings { Width = WidthPixels, Height = HeightPixels };   // low res for speed
         SunLight sun = new SunLight { Direction = SysVec3.Normalize(new SysVec3(-1f, -1.5f, -0.5f)) };
         _raytracer = new CpuRaytracer(rtSettings, sun);
         _raytracedTex = new GlTexture(rtSettings.Width, rtSettings.Height);
@@ -134,7 +136,7 @@ public class GameApp : GameWindow
 
         // Copy the raytracer image straight onto the screen surface (Framebuffer 0)
         GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, 0);
-        GL.BlitFramebuffer(0, 0, 320, 180,
+        GL.BlitFramebuffer(0, 0, WidthPixels, HeightPixels,
                           0, 0, Size.X, Size.Y,
                           ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
 

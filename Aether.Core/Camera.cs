@@ -13,6 +13,7 @@ namespace Aether.Core
 
         public Vector3 Forward { get; private set; }
         public Vector3 Right { get; private set; }
+        public Vector3 Up { get; private set; }
 
         public void Update()
         {
@@ -25,6 +26,7 @@ namespace Aether.Core
                 MathF.Cos(pitchRad) * MathF.Sin(yawRad)
             ));
             Right = Vector3.Normalize(Vector3.Cross(Forward, Vector3.UnitY));
+            Up = Vector3.Normalize(Vector3.Cross(Forward, Right));
         }
 
         // Returns a 4×4 view matrix (compatible with OpenTK Matrix4)
