@@ -53,8 +53,10 @@ public class GameApp : GameWindow
         _plane = MeshFactory.CreatePlane(20f);
         _cube = MeshFactory.CreateCube(0.5f);
 
-        // Load shaders (see shader source below)
-        _shader = new ShaderProgram(SceneVert, SceneFrag);
+        // Load shaders from disk (Shaders/scene.vert, Shaders/scene.frag)
+        _shader = new ShaderProgram(
+            ShaderSourceLoader.Load(@"Shaders\scene.vert"),
+            ShaderSourceLoader.Load(@"Shaders\scene.frag"));
 
         // Build scene for raytracer
         _scene.Objects.Add(new SceneObject
@@ -168,60 +170,4 @@ public class GameApp : GameWindow
         GL.DeleteFramebuffer(_blitFbo);
         base.OnUnload();
     }
-
-    // Modified vertex shader to pass UV coordinates to the fragment shader
-    private const string SceneVert = @"
-        #version 330 core
-        layout(location=0) in vec3 aPos;
-        layout(location=1) in vec3 aNormal;
-        layout(location=2) in vec2 aUV;
-        
-        uniform mat4 uModel, uView, uProjection;
-        
-        out vec3 vNormal;
-        out vec3 vFragPos;
-        out vec2 vUV;
-
-        void main() {
-            vec4 worldPos  = uModel * vec4(aPos, 1.0);
-            vFragPos       = worldPos.xyz;
-            vNormal        = mat3(transpose(inverse(uModel))) * aNormal;
-            vUV            = aUV; // Pass texture coordinates down
-            gl_Position    = uProjection * uView * worldPos;
-        }";
-
-    // Hybrid fragment shader that can toggle between standard lighting and raytracer texture
-    private const string SceneFrag = @"
-        #version 330 core
-        in  vec3 vNormal;
-        in  vec3 vFragPos;
-        in  vec2 vUV;
-        out vec4 FragColor;
-
-        uniform vec3 uSunDir     = normalize(vec3(-1.0, -1.5, -0.5));
-        uniform vec3 uSunColor   = vec3(1.0, 0.95, 0.85);
-        uniform vec3 uAlbedo     = vec3(0.75, 0.75, 0.75);
-
-        uniform sampler2D uRaytraceTexture;
-        uniform bool uUseTexture = false;
-
-        void main() {
-            // Emissive shortcut for our sun object
-            if (uAlbedo.r > 1.5) {
-                FragColor = vec4(uAlbedo, 1.0);
-                return;
-            }
-
-            // If toggled, map our raytracer pixels straight onto the surface geometry
-            if (uUseTexture) {
-                FragColor = texture(uRaytraceTexture, vUV);
-                return;
-            }
-
-            // Fallback standard rasterization shader
-            vec3  n       = normalize(vNormal);
-            float diff    = max(dot(n, -uSunDir), 0.0);
-            vec3  color   = uAlbedo * (uSunColor * diff + vec3(0.08));
-            FragColor     = vec4(color, 1.0);
-        }";
 }
