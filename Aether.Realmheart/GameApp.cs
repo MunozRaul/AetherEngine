@@ -31,8 +31,6 @@ public class GameApp : GameWindow
     private GpuRaytracer _raytracer = null!;
     private float _raytraceCooldown = 0f;
     private const float RaytracePeriod = 0.016f;   // re-render every 16 ms (60 fps)
-    private const int WidthPixels = 640;
-    private const int HeightPixels = 360;
 
     // Input
     private InputHandler _input = null!;
@@ -72,19 +70,16 @@ public class GameApp : GameWindow
         };
         _scene.Objects.Add(_raytracerCube);
 
-        // Raytracer
-        RaytracerSettings rtSettings = new RaytracerSettings { Width = WidthPixels, Height = HeightPixels };   // low res for speed
+        // Raytracer. Width/Height here are just RaytracerSettings' informational defaults.
+        // The actual render target resolution now tracks the window size (see CreateRaytraceTarget).
+        RaytracerSettings rtSettings = new RaytracerSettings();
         SunLight sun = new SunLight { Direction = SysVec3.Normalize(new SysVec3(-1f, -1.5f, -0.5f)) };
         _raytracer = new GpuRaytracer(rtSettings, sun);
-        _raytracedTex = new GlTexture(rtSettings.Width, rtSettings.Height);
 
-        // Create the blit FBO once and permanently attach the raytraced texture because its handle never changes,
-        // only its contents does (via GlTexture.Upload), so there's no need to recreate this every frame.
+        // The FBO handle itself is created once (only its texture attachment gets swapped out
+        // on resize, see CreateRaytraceTarget), since only the attached texture ever needs replacing.
         _blitFbo = GL.GenFramebuffer();
-        GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _blitFbo);
-        GL.FramebufferTexture2D(FramebufferTarget.ReadFramebuffer, FramebufferAttachment.ColorAttachment0,
-                                TextureTarget.Texture2D, _raytracedTex.Handle, 0);
-        GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, 0);
+        CreateRaytraceTarget(Size.X, Size.Y);
 
         _camera.Position = new SysVec3(0, 1.7f, 5f);
         _camera.Yaw = -90f; // Forces the camera orientation matrix to point at the scene center
@@ -141,13 +136,13 @@ public class GameApp : GameWindow
         base.OnRenderFrame(e);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-        // This stretches my 320x180 raytraced image across my full screen window
-        // _blitFbo already has _raytracedTex permanently attached (see OnLoad)
+        // _raytracedTex is now always sized to match the window (see CreateRaytraceTarget),
+        // so this is a 1:1 copy, not a stretch which means no upscale blur/blockiness.
         GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _blitFbo);
 
         // Copy the raytracer image straight onto the screen surface (Framebuffer 0)
         GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, 0);
-        GL.BlitFramebuffer(0, 0, WidthPixels, HeightPixels,
+        GL.BlitFramebuffer(0, 0, _raytracedTex.Width, _raytracedTex.Height,
                           0, 0, Size.X, Size.Y,
                           ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
 
@@ -158,6 +153,29 @@ public class GameApp : GameWindow
     {
         base.OnResize(e);
         GL.Viewport(0, 0, e.Width, e.Height);
+
+        // Re-allocate the raytrace target to match the new window size (e.g. entering fullscreen).
+        // Skip zero-sized events (window minimized) since TexStorage2D can't allocate empty storage,
+        // and skip redundant recreations if the size didn't actually change.
+        if (e.Width > 0 && e.Height > 0 && _raytracedTex != null &&
+            (e.Width != _raytracedTex.Width || e.Height != _raytracedTex.Height))
+        {
+            CreateRaytraceTarget(e.Width, e.Height);
+        }
+    }
+
+    // (Re)allocates _raytracedTex at the given size and re-points the (already-existing) blit FBOs
+    // color attachment at it. TexStorage2D storage is immutable, so a resize means delete + recreate,
+    // not an in-place update.
+    private void CreateRaytraceTarget(int width, int height)
+    {
+        _raytracedTex?.Dispose();
+        _raytracedTex = new GlTexture(width, height);
+
+        GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _blitFbo);
+        GL.FramebufferTexture2D(FramebufferTarget.ReadFramebuffer, FramebufferAttachment.ColorAttachment0,
+                                TextureTarget.Texture2D, _raytracedTex.Handle, 0);
+        GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, 0);
     }
 
     protected override void OnUnload()

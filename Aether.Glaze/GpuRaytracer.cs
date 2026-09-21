@@ -52,7 +52,9 @@ public class GpuRaytracer : IDisposable
         _program.SetVector3("uCamForward", ToGl(camera.Forward));
         _program.SetVector3("uCamRight", ToGl(camera.Right));
         _program.SetVector3("uCamUp", ToGl(camera.Up));
-        _program.SetFloat("uAspect", (float)_settings.Width / _settings.Height);
+        // Read straight off the target texture (not _settings) so aspect stays correct
+        // even after the caller resizes the render target to match a resized window.
+        _program.SetFloat("uAspect", (float)target.Width / target.Height);
         _program.SetFloat("uFovScale", _fovScale);
         _program.SetVector3("uSunToSun", ToGl(_sun.ToSun));
         _program.SetVector3("uSunColor", ToGl(_sun.Color));
