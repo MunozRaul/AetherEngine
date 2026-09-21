@@ -46,7 +46,7 @@ switching graphics APIs.
 - [ ] Add triangle mesh support to the raytracer (currently only `Box` and `InfinitePlane`)
 - [ ] Build a BVH (simple median-split builder is fine to start) for scene intersection instead of
       the current O(n) linear scan in `Scene.HitAnything`
-- [ ] Remove/replace stub placeholders (`FullscreenQuad.cs`, `MathHelper.cs`) once their real use lands
+- [x] Remove/replace stub placeholders (`FullscreenQuad.cs`, `MathHelper.cs`) once their real use lands
 - [x] Cache the blit framebuffer instead of creating/deleting an FBO every frame in `OnRenderFrame`
 
 ### GPU Migration
