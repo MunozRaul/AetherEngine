@@ -25,6 +25,7 @@ public class GameApp : GameWindow
     private Mesh _plane = null!;
     private Mesh _cube = null!;
     private GlTexture _raytracedTex = null!;
+    private int _blitFbo;
 
     // Raytracer
     private CpuRaytracer _raytracer = null!;
@@ -69,6 +70,14 @@ public class GameApp : GameWindow
         SunLight sun = new SunLight { Direction = SysVec3.Normalize(new SysVec3(-1f, -1.5f, -0.5f)) };
         _raytracer = new CpuRaytracer(rtSettings, sun);
         _raytracedTex = new GlTexture(rtSettings.Width, rtSettings.Height);
+
+        // Create the blit FBO once and permanently attach the raytraced texture because its handle never changes,
+        // only its contents does (via GlTexture.Upload), so there's no need to recreate this every frame.
+        _blitFbo = GL.GenFramebuffer();
+        GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _blitFbo);
+        GL.FramebufferTexture2D(FramebufferTarget.ReadFramebuffer, FramebufferAttachment.ColorAttachment0,
+                                TextureTarget.Texture2D, _raytracedTex.Handle, 0);
+        GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, 0);
 
         _camera.Position = new SysVec3(0, 1.7f, 5f);
         _camera.Yaw = -90f; // Forces the camera orientation matrix to point at the scene center
@@ -126,21 +135,14 @@ public class GameApp : GameWindow
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
         // This stretches my 320x180 raytraced image across my full screen window
-        GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, 0);
-
-        // Create an internal framebuffer to hold the texture for copying
-        int fbo = GL.GenFramebuffer();
-        GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, fbo);
-        GL.FramebufferTexture2D(FramebufferTarget.ReadFramebuffer, FramebufferAttachment.ColorAttachment0,
-                                TextureTarget.Texture2D, _raytracedTex.Handle, 0);
+        // _blitFbo already has _raytracedTex permanently attached (see OnLoad)
+        GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, _blitFbo);
 
         // Copy the raytracer image straight onto the screen surface (Framebuffer 0)
         GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, 0);
         GL.BlitFramebuffer(0, 0, WidthPixels, HeightPixels,
                           0, 0, Size.X, Size.Y,
                           ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
-
-        GL.DeleteFramebuffer(fbo);
 
         SwapBuffers();
     }
@@ -157,6 +159,7 @@ public class GameApp : GameWindow
         _plane.Dispose();
         _cube.Dispose();
         _raytracedTex.Dispose();
+        GL.DeleteFramebuffer(_blitFbo);
         base.OnUnload();
     }
 
