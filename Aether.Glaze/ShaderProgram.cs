@@ -21,6 +21,20 @@ public class ShaderProgram : IDisposable
         GL.LinkProgram(_handle);
         GL.DeleteShader(vert);
         GL.DeleteShader(frag);
+        CheckLinkStatus();
+    }
+
+    // Compute-shader-only overload: a compute program is just a single shader stage,
+    // no vertex/fragment pairing needed.
+    public ShaderProgram(string computeSource)
+    {
+        int comp = CompileShader(ShaderType.ComputeShader, computeSource);
+
+        _handle = GL.CreateProgram();
+        GL.AttachShader(_handle, comp);
+        GL.LinkProgram(_handle);
+        GL.DeleteShader(comp);
+        CheckLinkStatus();
     }
 
     public void Use() => GL.UseProgram(_handle);
@@ -34,6 +48,9 @@ public class ShaderProgram : IDisposable
     public void SetInt(string name, int value)
         => GL.Uniform1(GL.GetUniformLocation(_handle, name), value);
 
+    public void SetFloat(string name, float value)
+        => GL.Uniform1(GL.GetUniformLocation(_handle, name), value);
+
     private static int CompileShader(ShaderType type, string source)
     {
         int shader = GL.CreateShader(type);
@@ -42,6 +59,12 @@ public class ShaderProgram : IDisposable
         GL.GetShader(shader, ShaderParameter.CompileStatus, out int ok);
         if (ok == 0) throw new Exception(GL.GetShaderInfoLog(shader));
         return shader;
+    }
+
+    private void CheckLinkStatus()
+    {
+        GL.GetProgram(_handle, GetProgramParameterName.LinkStatus, out int ok);
+        if (ok == 0) throw new Exception(GL.GetProgramInfoLog(_handle));
     }
 
     public void SetVector3(string name, Vector3 val)

@@ -40,7 +40,7 @@ switching graphics APIs.
 ## Roadmap
 
 ### Foundations
-- [ ] Introduce a proper `Material` system (albedo, roughness, metallic, emissive) on `SceneObject`
+- [x] Introduce a proper `Material` system (albedo, roughness, metallic, emissive) on `SceneObject`
 - [ ] Unify the scene representation used by the rasterizer and raytracer (currently duplicated —
       `Scene.Objects` vs. `Mesh`/`Transform` are kept in sync manually)
 - [ ] Add triangle mesh support to the raytracer (currently only `Box` and `InfinitePlane`)
@@ -50,8 +50,8 @@ switching graphics APIs.
 - [x] Cache the blit framebuffer instead of creating/deleting an FBO every frame in `OnRenderFrame`
 
 ### GPU Migration
-- [ ] Port `CpuRaytracer` logic into a GLSL compute shader (scene data as SSBOs: primitives, BVH, materials)
-- [ ] Write compute shader output directly to a storage texture/image for compositing
+- [x] Port `CpuRaytracer` logic into a GLSL compute shader (scene data as SSBOs: primitives, materials)
+- [x] Write compute shader output directly to a storage texture/image for compositing
 - [ ] Iterative (stack-based) BVH traversal in the compute shader for triangle meshes
 
 ### Hybrid Rendering (the "Lumen concept")

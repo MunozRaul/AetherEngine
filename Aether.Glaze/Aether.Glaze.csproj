@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Aether.Core\Aether.Core.csproj" />
+    <ProjectReference Include="..\Aether.Ray\Aether.Ray.csproj" />
   </ItemGroup>
 
   <ItemGroup>

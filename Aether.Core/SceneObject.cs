@@ -6,6 +6,5 @@
 public class SceneObject
 {
     public required IHittable Hittable { get; set; }
-
-    // TODO: add material property
+    public Material Material { get; set; } = new();
 }

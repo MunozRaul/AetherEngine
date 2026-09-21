@@ -28,7 +28,7 @@ public class GameApp : GameWindow
     private int _blitFbo;
 
     // Raytracer
-    private CpuRaytracer _raytracer = null!;
+    private GpuRaytracer _raytracer = null!;
     private float _raytraceCooldown = 0f;
     private const float RaytracePeriod = 0.016f;   // re-render every 16 ms (60 fps)
     private const int WidthPixels = 640;
@@ -57,18 +57,23 @@ public class GameApp : GameWindow
         _shader = new ShaderProgram(SceneVert, SceneFrag);
 
         // Build scene for raytracer
-        _scene.Objects.Add(new SceneObject { Hittable = new InfinitePlane() });
+        _scene.Objects.Add(new SceneObject
+        {
+            Hittable = new InfinitePlane(),
+            Material = new Material { Albedo = new SysVec3(0.3f, 0.6f, 0.3f) } // greenish floor
+        });
         // Cube AABB — will update each frame to match animation
         _raytracerCube = new SceneObject
         {
-            Hittable = new Box { Min = new SysVec3(-0.25f, 1.25f, -0.25f), Max = new SysVec3(0.25f, 1.75f, 0.25f) }
+            Hittable = new Box { Min = new SysVec3(-0.25f, 1.25f, -0.25f), Max = new SysVec3(0.25f, 1.75f, 0.25f) },
+            Material = new Material { Albedo = new SysVec3(0.8f, 0.2f, 0.2f) } // reddish cube
         };
         _scene.Objects.Add(_raytracerCube);
 
         // Raytracer
         RaytracerSettings rtSettings = new RaytracerSettings { Width = WidthPixels, Height = HeightPixels };   // low res for speed
         SunLight sun = new SunLight { Direction = SysVec3.Normalize(new SysVec3(-1f, -1.5f, -0.5f)) };
-        _raytracer = new CpuRaytracer(rtSettings, sun);
+        _raytracer = new GpuRaytracer(rtSettings, sun);
         _raytracedTex = new GlTexture(rtSettings.Width, rtSettings.Height);
 
         // Create the blit FBO once and permanently attach the raytraced texture because its handle never changes,
@@ -119,12 +124,12 @@ public class GameApp : GameWindow
             };
         }
 
-        // Re-raytrace periodically (not every frame — it's slow)
+        // Re-raytrace periodically (not every frame, even on GPU this keeps CPU-side scene
+        // upload overhead in check while we don't yet have dirty-tracking)
         _raytraceCooldown -= dt;
         if (_raytraceCooldown <= 0f)
         {
-            byte[] pixels = _raytracer.Render(_scene, _camera);
-            _raytracedTex.Upload(pixels);
+            _raytracer.Render(_scene, _camera, _raytracedTex);
             _raytraceCooldown = RaytracePeriod;
         }
     }
@@ -159,6 +164,7 @@ public class GameApp : GameWindow
         _plane.Dispose();
         _cube.Dispose();
         _raytracedTex.Dispose();
+        _raytracer.Dispose();
         GL.DeleteFramebuffer(_blitFbo);
         base.OnUnload();
     }
